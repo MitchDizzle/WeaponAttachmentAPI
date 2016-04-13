@@ -4,6 +4,7 @@
 int plyAttachmentEnts[MAXPLAYERS+1] = {-1,...};
 int plyLastWeapon[MAXPLAYERS+1] = {-1,...};
 char plyLastAttachment[MAXPLAYERS+1][32];
+float emptyVector[3];
 
 #define PLUGIN_VERSION              "1.0.0"
 public Plugin myinfo = {
@@ -86,8 +87,12 @@ public bool GetAttachmentPosition(client, char[] attachment, float epos[3]) {
 	if(plyLastWeapon[client] != weapon || !StrEqual(attachment, plyLastAttachment[client], false)) {
 		//The position is different, need to relocate the entity.
 		UnparentEntity(aent);
-		ParentEntity(aent, weapon, attachment);
+		int wm = GetEntPropEnt(weapon, Prop_Send, "m_hWeaponWorldModel");
+		ParentEntity(aent, wm, attachment);
+		TeleportEntity(aent, emptyVector, NULL_VECTOR, NULL_VECTOR);
 	}
+	plyLastWeapon[client] = weapon;
+	strcopy(plyLastAttachment[client], 32, attachment);
 	GetEntPropVector(aent, Prop_Data, "m_vecAbsOrigin", epos);
 	return true;
 }
