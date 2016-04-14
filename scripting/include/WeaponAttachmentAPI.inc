@@ -1,4 +1,4 @@
-//Custom Player Skins include file
+//Weapon Attachment API include file
 
 #if defined _WeaponAttachmentAPI_included
  #endinput
