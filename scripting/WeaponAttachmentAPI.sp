@@ -6,7 +6,7 @@ int plyLastWeapon[MAXPLAYERS+1] = {-1,...};
 char plyLastAttachment[MAXPLAYERS+1][32];
 float emptyVector[3];
 
-#define PLUGIN_VERSION              "1.0.0"
+#define PLUGIN_VERSION              "1.0.1"
 public Plugin myinfo = {
 	name = "Weapon Attachment API",
 	author = "Mitchell",
@@ -15,9 +15,6 @@ public Plugin myinfo = {
 	url = "http://mtch.tech"
 };
 
-/*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-------Plugin Functions
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
 	CreateNative("WA_GetAttachmentPos", Native_GetAttachmentPos);
 	RegPluginLibrary("WeaponAttachmentAPI");
@@ -29,10 +26,7 @@ public OnPluginStart() {
 
 	HookEvent("player_death", Event_Death);
 }
-/*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-------OnPluginEnd		(type: Plugin Function)
-	Make sure to delete all the attachment point entities.
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
+
 public OnPluginEnd() {
 	for(int i = 1; i <= MaxClients; i++) {
 		if(IsClientInGame(i)) {
@@ -41,10 +35,6 @@ public OnPluginEnd() {
 	}
 }
 
-/*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-------Native_GetAttachmentPos		(type: Native)
-	Core function to set the player's skin from another plugin.
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 public Native_GetAttachmentPos(Handle plugin, args) {
 	int client = GetNativeCell(1);
 	bool result = false;
@@ -57,10 +47,7 @@ public Native_GetAttachmentPos(Handle plugin, args) {
 	}
 	return result;
 }
-
-/*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-------Event_Death		(type: Event)
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
+//Do we even really need to remove the entity on death?
 public Action Event_Death(Event event, const char[] name, bool dontBroadcast) {
 	int client = GetClientOfUserId(GetEventInt(event, "userid"));
 	if(IsClientInGame(client)) {
@@ -68,9 +55,6 @@ public Action Event_Death(Event event, const char[] name, bool dontBroadcast) {
 	}
 }
 
-/*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-------Attachment Helper Methods
-<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 public bool GetAttachmentPosition(client, char[] attachment, float epos[3]) {
 	if(StrEqual(attachment, "")) {
 		return false;
@@ -86,9 +70,12 @@ public bool GetAttachmentPosition(client, char[] attachment, float epos[3]) {
 	int weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
 	if(plyLastWeapon[client] != weapon || !StrEqual(attachment, plyLastAttachment[client], false)) {
 		//The position is different, need to relocate the entity.
-		UnparentEntity(aent);
+		AcceptEntityInput(aent, "ClearParent");
 		int wm = GetEntPropEnt(weapon, Prop_Send, "m_hWeaponWorldModel");
-		ParentEntity(aent, wm, attachment);
+		SetVariantString("!activator");
+		AcceptEntityInput(aent, "SetParent", wm, aent, 0);
+		SetVariantString(attachment);
+		AcceptEntityInput(aent, "SetParentAttachment", aent, aent, 0);
 		TeleportEntity(aent, emptyVector, NULL_VECTOR, NULL_VECTOR);
 	}
 	plyLastWeapon[client] = weapon;
@@ -130,19 +117,4 @@ public NativeCheck_IsClientValid(int client) {
 		return ThrowNativeError(SP_ERROR_NATIVE, "Client %i is not in game", client);
 	}
 	return true;
-}
-
-public SetCvar(char[] scvar, char[] svalue) {
-	SetConVarString(FindConVar(scvar), svalue, true);
-}
-
-public UnparentEntity(int child) {
-	AcceptEntityInput(child, "ClearParent");
-}
-
-public ParentEntity(int child, int parent, char[] attachment) {
-	SetVariantString("!activator");
-	AcceptEntityInput(child, "SetParent", parent, child, 0);
-	SetVariantString(attachment);
-	AcceptEntityInput(child, "SetParentAttachment", child, child, 0);
 }
