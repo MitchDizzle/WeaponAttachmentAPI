@@ -5,8 +5,8 @@ int plyAttachmentEnts[MAXPLAYERS+1] = {-1,...};
 int plyLastWeapon[MAXPLAYERS+1] = {-1,...};
 char plyLastAttachment[MAXPLAYERS+1][32];
 float emptyVector[3];
-
-#define PLUGIN_VERSION              "1.0.1"
+EngineVersion EVGame;
+#define PLUGIN_VERSION              "1.0.2"
 public Plugin myinfo = {
 	name = "Weapon Attachment API",
 	author = "Mitchell",
@@ -23,7 +23,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public OnPluginStart() {
 	CreateConVar("sm_weapon_attachment_api_version", PLUGIN_VERSION, "Weapon Attachment API Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
-
+	EVGame = GetEngineVersion();
 	HookEvent("player_death", Event_Death);
 }
 
@@ -70,16 +70,16 @@ public bool GetAttachmentPosition(client, char[] attachment, float epos[3]) {
 	int weapon = GetEntPropEnt(client, Prop_Data, "m_hActiveWeapon");
 	if(plyLastWeapon[client] != weapon || !StrEqual(attachment, plyLastAttachment[client], false)) {
 		//The position is different, need to relocate the entity.
+		plyLastWeapon[client] = weapon;
+		strcopy(plyLastAttachment[client], 32, attachment);
 		AcceptEntityInput(aent, "ClearParent");
-		int wm = GetEntPropEnt(weapon, Prop_Send, "m_hWeaponWorldModel");
+		if(EVGame == Engine_CSGO) weapon = GetEntPropEnt(weapon, Prop_Send, "m_hWeaponWorldModel");
 		SetVariantString("!activator");
-		AcceptEntityInput(aent, "SetParent", wm, aent, 0);
+		AcceptEntityInput(aent, "SetParent", weapon, aent, 0);
 		SetVariantString(attachment);
 		AcceptEntityInput(aent, "SetParentAttachment", aent, aent, 0);
 		TeleportEntity(aent, emptyVector, NULL_VECTOR, NULL_VECTOR);
 	}
-	plyLastWeapon[client] = weapon;
-	strcopy(plyLastAttachment[client], 32, attachment);
 	GetEntPropVector(aent, Prop_Data, "m_vecAbsOrigin", epos);
 	return true;
 }
