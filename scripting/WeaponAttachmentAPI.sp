@@ -7,6 +7,7 @@ int plyLastWeapon[MAXPLAYERS+1] = {-1,...};
 char plyLastAttachment[MAXPLAYERS+1][32];
 float emptyVector[3];
 EngineVersion EVGame;
+char gameAttachPoint[32];
 
 #define EF_BONEMERGE                (1 << 0)
 #define EF_NOSHADOW                 (1 << 4)
@@ -30,6 +31,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public OnPluginStart() {
 	CreateConVar("sm_weapon_attachment_api_version", PLUGIN_VERSION, "Weapon Attachment API Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
 	EVGame = GetEngineVersion();
+	GetGameAttachPoint();
 	HookEvent("player_death", Event_Death);
 }
 
@@ -38,6 +40,14 @@ public OnPluginEnd() {
 		if(IsClientInGame(i)) {
 			RemoveAttachEnt(i);
 		}
+	}
+}
+
+public GetGameAttachPoint() {
+	switch(EVGame) {
+		case Engine_CSS: gameAttachPoint = "muzzle_flash";
+		case Engine_TF2, Engine_DODS: gameAttachPoint = "weapon_bone";
+		case Engine_HL2DM: gameAttachPoint = "chest";
 	}
 }
 
@@ -79,22 +89,23 @@ public bool GetAttachmentPosition(client, char[] attachment, float epos[3]) {
 		plyLastWeapon[client] = weapon;
 		strcopy(plyLastAttachment[client], 32, attachment);
 		AcceptEntityInput(aent, "ClearParent");
-		if(EVGame == Engine_CSGO) weapon = GetEntPropEnt(weapon, Prop_Send, "m_hWeaponWorldModel");
-		else {
+		if(EVGame == Engine_CSGO) {
+			weapon = GetEntPropEnt(weapon, Prop_Send, "m_hWeaponWorldModel");
+		} else {
 			//Games other than CSGO, what a hassle.
-			int modelIndex = GetEntProp(weapon, Prop_Send, "m_iWorldModelIndex");
+			char modelName[PLATFORM_MAX_PATH];
+			//Setting the model's index will not update attachment names..
+			findModelString(GetEntProp(weapon, Prop_Send, "m_iWorldModelIndex"), modelName, sizeof(modelName));
 			int pent = GetAttachmentProp(client);
 			if(pent == INVALID_ENT_REFERENCE) {
-				PrintToServer("%N's Attachment prop was invalid, creating new one");
 				pent = CreateAttachmentProp(client);
 				if(!IsValidEntity(aent)) {
-					PrintToServer("%N's Attachment prop was invalid twice, aborting.");
 					return false;
 				}
 			}
 			AcceptEntityInput(pent, "ClearParent");
-			SetEntProp(pent, Prop_Send, "m_nModelIndex", modelIndex);
-			setParent(pent, client, "muzzle_flash");
+			SetEntityModel(pent, modelName);
+			setParent(pent, client, gameAttachPoint);
 			weapon = pent;
 		}
 		setParent(aent, weapon, attachment);
@@ -143,7 +154,6 @@ public CreateAttachmentProp(int client) {
 	DispatchKeyValue(pent, "disableshadows", "1");
 	DispatchKeyValue(pent, "solid", "0");
 	DispatchKeyValue(pent, "spawnflags", "256");
-	SetEntProp(pent, Prop_Send, "m_CollisionGroup", 11);
 	DispatchSpawn(pent);
 	SetEntProp(pent, Prop_Send, "m_fEffects", 32|EF_BONEMERGE|EF_NOSHADOW|EF_NORECEIVESHADOW|EF_PARENT_ANIMATES);
 	return pent;
@@ -179,6 +189,16 @@ public NativeCheck_IsClientValid(int client) {
 public setParent(int child, int parent, char[] attachment) {
 	SetVariantString("!activator");
 	AcceptEntityInput(child, "SetParent", parent, child, 0);
-	SetVariantString(attachment);
-	AcceptEntityInput(child, "SetParentAttachment", child, child, 0);
+	if(!StrEqual(attachment, "")) {
+		SetVariantString(attachment);
+		AcceptEntityInput(child, "SetParentAttachment", child, child, 0);
+	}
+}
+
+public int findModelString(int modelIndex, char[] modelString, int string_size) {
+	static int stringTable = INVALID_STRING_TABLE;
+	if (stringTable == INVALID_STRING_TABLE) {
+		stringTable = FindStringTable("modelprecache");
+	}
+	return ReadStringTable(stringTable, modelIndex, modelString, string_size);
 }
