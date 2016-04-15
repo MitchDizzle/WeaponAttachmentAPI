@@ -21,7 +21,6 @@ public OnMapStart() {
 	sprLaserBeam = PrecacheModel("materials/sprites/laserbeam.vmt");
 }
 
-
 public Action Command_Test(int client, int args) {
 	float apos[3];
 	float epos[3];

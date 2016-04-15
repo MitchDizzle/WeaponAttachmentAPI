@@ -13,7 +13,7 @@ char gameAttachPoint[32];
 #define EF_NOSHADOW                 (1 << 4)
 #define EF_NORECEIVESHADOW          (1 << 6)
 #define EF_PARENT_ANIMATES          (1 << 9)
-#define PLUGIN_VERSION              "1.0.2"
+#define PLUGIN_VERSION              "1.1.0"
 public Plugin myinfo = {
 	name = "Weapon Attachment API",
 	author = "Mitchell",

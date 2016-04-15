@@ -2,7 +2,7 @@
 #include <WeaponAttachmentAPI>
 #pragma semicolon 1
 
-#define PLUGIN_VERSION              "1.0.0"
+#define PLUGIN_VERSION              "1.0.1"
 public Plugin myinfo = {
 	name = "WA Weapon Lasers",
 	author = "Mitchell",
@@ -19,10 +19,10 @@ public OnPluginStart() {
 	hLaserClr = CreateConVar("sm_walt_color", "0", "Hex color of laserbeam (#RGBA); 0 = Team colored; 1 = Random",  FCVAR_PLUGIN, true, 0.0, true, 1.0);
 	HookConVarChange(hLaserClr, OnConVarChange);
 	AutoExecConfig(true, "WeaponLasers");
-	
+
 	CreateConVar("sm_wa_weapon_lasers_version", PLUGIN_VERSION, "WA Laser Tag Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
+
 	HookEvent("bullet_impact", Event_Impact, EventHookMode_Pre);
-	
 }
 
 public OnConVarChange(ConVar convar, const char[] oldValue, const char[] newValue){
@@ -35,15 +35,13 @@ public OnConVarChange(ConVar convar, const char[] oldValue, const char[] newValu
 	}
 }
 
-
 public OnMapStart() {
 	sprLaserBeam = PrecacheModel("materials/sprites/laserbeam.vmt");
 }
 
 public Action Event_Impact(Event event, const char[] name, bool dontBroadcast) {
-	int userid = GetEventInt(event, "userid");
-	int client = GetClientOfUserId(userid);
-	if(client > 0 || IsPlayerAlive(client)) {
+	int client = GetClientOfUserId(GetEventInt(event, "userid"));
+	if(client > 0 && IsClientInGame(client) && IsPlayerAlive(client)) {
 		DataPack dp = new DataPack(); 
 		CreateDataTimer(0.0, Timer_ShowBeam, dp, TIMER_FLAG_NO_MAPCHANGE|TIMER_DATA_HNDL_CLOSE);
 		dp.WriteCell(GetClientUserId(client));
