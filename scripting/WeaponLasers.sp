@@ -1,8 +1,9 @@
 #include <sdktools>
+#include <clientprefs>
 #include <WeaponAttachmentAPI>
 #pragma semicolon 1
 
-#define PLUGIN_VERSION              "1.1.0"
+#define PLUGIN_VERSION              "1.2.0"
 public Plugin myinfo = {
 	name = "WA Weapon Lasers",
 	author = "Mitchell",
@@ -13,6 +14,7 @@ public Plugin myinfo = {
 
 int sprLaserBeam = -1;
 
+ConVar hLaser;
 ConVar hLaserClr;
 ConVar hLaserClrT;
 ConVar hLaserClrCT;
@@ -20,6 +22,8 @@ ConVar hLaserWidth;
 ConVar hLaserEndWidth;
 ConVar hLaserRndrAmt;
 ConVar hLaserView;
+ConVar hLaserTime;
+bool bLaser = true;
 int iLaserColorType = 0;
 int iLaserColor[4] = {12, 255, 12, 255};
 int iLaserColorT[4] = {255, 12, 12, 255};
@@ -28,11 +32,17 @@ float fLaserWidth = 2.0;
 float fLaserEndWidth = 2.0;
 int iLaserRndrAmt = 200;
 int iLaserView = 0;
+float fLaserTime = 0.1;
+
+//Client Prefs
+Handle cDisableLasers;
 
 int plyArray[2][MAXPLAYERS+1];
 int plyArrayCnt[2];
+bool plyDisable[MAXPLAYERS+1] = {false, ...};
 
 public OnPluginStart() {
+	hLaser = CreateConVar("sm_walt", "1", "Enable/Disable this plugin",  FCVAR_PLUGIN);
 	hLaserClr = CreateConVar("sm_walt_color", "0", "Hex color of laserbeam (#RGBA); 0 = Team colored; 1 = Random",  FCVAR_PLUGIN);
 	hLaserClrT = CreateConVar("sm_walt_color_t", "FF0C0C", "Hex color of t laserbeam (#RGBA)",  FCVAR_PLUGIN);
 	hLaserClrCT = CreateConVar("sm_walt_color_ct", "0C0CFF", "Hex color of ct laserbeam (#RGBA)",  FCVAR_PLUGIN);
@@ -40,6 +50,8 @@ public OnPluginStart() {
 	hLaserEndWidth = CreateConVar("sm_walt_endwidth", "2.0", "End Width of the laser beam",  FCVAR_PLUGIN);
 	hLaserRndrAmt = CreateConVar("sm_walt_renderamt", "200", "Render amount of the laser beam",  FCVAR_PLUGIN);
 	hLaserView = CreateConVar("sm_walt_view", "0", "Who can see the beam; 0 = All, 1 = User-only, 2 = Enemies, 3 = Teammates",  FCVAR_PLUGIN);
+	hLaserTime = CreateConVar("sm_walt_time", "0.1", "Life time of the laser",  FCVAR_PLUGIN);
+	HookConVarChange(hLaser, OnConVarChange);
 	HookConVarChange(hLaserClr, OnConVarChange);
 	HookConVarChange(hLaserClrT, OnConVarChange);
 	HookConVarChange(hLaserClrCT, OnConVarChange);
@@ -47,17 +59,27 @@ public OnPluginStart() {
 	HookConVarChange(hLaserEndWidth, OnConVarChange);
 	HookConVarChange(hLaserRndrAmt, OnConVarChange);
 	HookConVarChange(hLaserView, OnConVarChange);
+	HookConVarChange(hLaserTime, OnConVarChange);
 	AutoExecConfig(true, "WeaponLasers");
 
 	CreateConVar("sm_wa_weapon_lasers_version", PLUGIN_VERSION, "WA Laser Tag Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
+	
+	//Client Prefs:
+	cDisableLasers = RegClientCookie("walt_disablelasers", "Disable Weapon Lasers", CookieAccess_Private);
+	SetCookieMenuItem(PrefMenu, 0, "Weapon Lasers");
+	for(int i=1; i < MAXPLAYERS; i++) {
+		if(IsClientInGame(i) && AreClientCookiesCached(i)) {
+			OnClientCookiesCached(i);
+		}
+	}
 
 	HookEvent("bullet_impact", Event_Impact, EventHookMode_Pre);
 	HookEvent("player_team", Event_Recalc);
-	//HookEvent("round_start", Event_Recalc);
 	HookEvent("round_freeze_end", Event_Recalc);
 
 	calcPlayerArrays();
 }
+
 
 public OnConVarChange(ConVar convar, const char[] oldValue, const char[] newValue){
 	if(convar == hLaserClr || convar == hLaserClrT || convar == hLaserClrCT) {
@@ -87,13 +109,19 @@ public OnConVarChange(ConVar convar, const char[] oldValue, const char[] newValu
 	} else if(convar == hLaserView) {
 		iLaserView = StringToInt(newValue);
 		calcPlayerArrays();
+	} else if(convar == hLaserTime) {
+		fLaserTime = StringToFloat(newValue);
+	} else if(convar == hLaser) {
+		bLaser = StringToInt(newValue) != 0;
 	}
 }
 
 public OnMapStart() {
 	sprLaserBeam = PrecacheModel("materials/sprites/laserbeam.vmt");
 }
+
 public Action Event_Impact(Event event, const char[] name, bool dontBroadcast) {
+	if(!bLaser) return Plugin_Continue;
 	int client = GetClientOfUserId(GetEventInt(event, "userid"));
 	if(client > 0 && IsClientInGame(client) && IsPlayerAlive(client) && iLaserRndrAmt >= 0) {
 		DataPack dp = new DataPack(); 
@@ -103,6 +131,7 @@ public Action Event_Impact(Event event, const char[] name, bool dontBroadcast) {
 		dp.WriteFloat(GetEventFloat(event, "y"));
 		dp.WriteFloat(GetEventFloat(event, "z"));
 	}
+	return Plugin_Continue;
 }
 	
 public Action Timer_ShowBeam(Handle timer, Handle dp) {
@@ -123,7 +152,7 @@ public Action Timer_ShowBeam(Handle timer, Handle dp) {
 	}
 	int color[4] = {12,12,12,255};
 	GetClientColor(client, color);
-	TE_SetupBeamPoints(epos, apos, sprLaserBeam, 0, 0, 0, 0.1, fLaserEndWidth, fLaserWidth, 10, 0.0, color, 0);
+	TE_SetupBeamPoints(epos, apos, sprLaserBeam, 0, 0, 0, fLaserTime, fLaserEndWidth, fLaserWidth, 10, 0.0, color, 0);
 	if(iLaserView == 0) {
 		//Putting this one first because it's the default value, and commonly used.
 		TE_SendToAll();
@@ -169,17 +198,67 @@ public Action Event_Recalc(Event event, const char[] name, bool dontBroadcast) {
 	calcPlayerArrays();
 }
 
+public calcPlayerArrayTeam(int t) {
+	if(iLaserView < 2 && t >= 0) return;
+	plyArrayCnt[t] = 0;
+	for(int i=1; i < MAXPLAYERS; i++) {
+		if(IsClientInGame(i) && !plyDisable[i]) {
+			plyArray[t][plyArrayCnt[t]++] = i;
+		}
+	}
+}
+
 public calcPlayerArrays() {
 	if(iLaserView < 2) return;
 	plyArrayCnt[0] = 0;
 	plyArrayCnt[1] = 0;
 	int t = -1;
 	for(int i=1; i < MAXPLAYERS; i++) {
-		if(IsClientInGame(i)) {
+		if(IsClientInGame(i) && !plyDisable[i]) {
 			t = GetClientTeam(i)-2;
 			if(t >= 0) {
 				plyArray[t][plyArrayCnt[t]++] = i;
 			}
 		}
+	}
+}
+
+//Client Prefs
+public OnClientCookiesCached(int client) {
+	char tempString[8];
+	GetClientCookie(client, cDisableLasers, tempString, sizeof(tempString));
+	plyDisable[client] = StringToInt(tempString) != 0;
+}
+
+public PrefMenu(int client, CookieMenuAction action, any info, char[] buffer, int maxlen){
+	if(action == CookieMenuAction_SelectOption) {
+		DisplaySettingsMenu(client);
+	}
+}
+
+public DisplaySettingsMenu(int client) {
+	Handle prefMenu = CreateMenu(PrefMenuHandler, MENU_ACTIONS_DEFAULT);
+	SetMenuTitle(prefMenu, "Weapon Lasers: ");
+	AddMenuItem(prefMenu, plyDisable[client] ? "enable" : "disable", plyDisable[client] ? "Enable Lasers" : "Disable Lasers");
+	DisplayMenu(prefMenu, client, MENU_TIME_FOREVER);
+}
+
+public PrefMenuHandler(Handle menu, MenuAction action, int client, int item){
+	if(action == MenuAction_Select) {
+		char tempString[8];
+		GetMenuItem(menu, item, tempString, sizeof(tempString));
+		if(StrEqual(tempString, "disable")) {
+			plyDisable[client] = true;
+			PrintToChat(client, "[SM] Weapon Lasers disabled.");
+			SetClientCookie(client, cDisableLasers, "1");
+		} else if(StrEqual(tempString, "enable")) {
+			plyDisable[client] = false;
+			PrintToChat(client, "[SM] Weapon Lasers enabled.");
+			SetClientCookie(client, cDisableLasers, "0");
+		}
+		calcPlayerArrayTeam(GetClientTeam(client)-2);
+		DisplaySettingsMenu(client);
+	} else if(action == MenuAction_End) {
+		CloseHandle(menu);
 	}
 }
