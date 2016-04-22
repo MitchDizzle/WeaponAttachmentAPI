@@ -72,6 +72,7 @@ public OnPluginStart() {
 			OnClientCookiesCached(i);
 		}
 	}
+	RegConsoleCmd("sm_lasers", Command_Lasers);
 
 	HookEvent("bullet_impact", Event_Impact, EventHookMode_Pre);
 	HookEvent("player_team", Event_Recalc);
@@ -155,7 +156,7 @@ public Action Timer_ShowBeam(Handle timer, Handle dp) {
 	TE_SetupBeamPoints(epos, apos, sprLaserBeam, 0, 0, 0, fLaserTime, fLaserEndWidth, fLaserWidth, 10, 0.0, color, 0);
 	if(iLaserView == 0) {
 		//Putting this one first because it's the default value, and commonly used.
-		TE_SendToAll();
+		TE_Send(plyArray[0], plyArrayCnt[0]);
 	} else if(iLaserView == 3) {
 		int t = GetClientTeam(client)-2;
 		if(t >= 0) {
@@ -199,6 +200,7 @@ public Action Event_Recalc(Event event, const char[] name, bool dontBroadcast) {
 }
 
 public calcPlayerArrayTeam(int t) {
+	if(iLaserView == 0) calcPlayerArrays();
 	if(iLaserView < 2 && t >= 0) return;
 	plyArrayCnt[t] = 0;
 	for(int i=1; i < MAXPLAYERS; i++) {
@@ -209,18 +211,25 @@ public calcPlayerArrayTeam(int t) {
 }
 
 public calcPlayerArrays() {
-	if(iLaserView < 2) return;
+	if(iLaserView == 1) return;
 	plyArrayCnt[0] = 0;
 	plyArrayCnt[1] = 0;
-	int t = -1;
+	int t = 0;
 	for(int i=1; i < MAXPLAYERS; i++) {
 		if(IsClientInGame(i) && !plyDisable[i]) {
-			t = GetClientTeam(i)-2;
+			if(iLaserView > 1) t = GetClientTeam(i)-2;
 			if(t >= 0) {
 				plyArray[t][plyArrayCnt[t]++] = i;
 			}
 		}
 	}
+}
+
+public Action Command_Lasers(int client, int args) {
+	if(client > 0){
+		DisplaySettingsMenu(client);
+	}
+	return Plugin_Handled;
 }
 
 //Client Prefs
