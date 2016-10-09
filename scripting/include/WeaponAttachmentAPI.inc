@@ -28,7 +28,7 @@ public SharedPlugin:__pl_WeaponAttachmentAPI =
 };
 
 #if !defined REQUIRE_PLUGIN
-public __pl_CustomPlayerSkins_SetNTVOptional()
+public __pl_WeaponAttachmentAPI_SetNTVOptional()
 {
 	MarkNativeAsOptional("WA_GetAttachmentPos");
 }

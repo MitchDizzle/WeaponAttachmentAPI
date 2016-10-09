@@ -13,7 +13,7 @@ char gameAttachPoint[32];
 #define EF_NOSHADOW                 (1 << 4)
 #define EF_NORECEIVESHADOW          (1 << 6)
 #define EF_PARENT_ANIMATES          (1 << 9)
-#define PLUGIN_VERSION              "1.1.0"
+#define PLUGIN_VERSION              "1.1.1"
 public Plugin myinfo = {
 	name = "Weapon Attachment API",
 	author = "Mitchell",
@@ -29,10 +29,13 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 }
 
 public OnPluginStart() {
-	CreateConVar("sm_weapon_attachment_api_version", PLUGIN_VERSION, "Weapon Attachment API Version", FCVAR_PLUGIN|FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
+	CreateConVar("sm_weapon_attachment_api_version", PLUGIN_VERSION, "Weapon Attachment API Version", FCVAR_SPONLY|FCVAR_REPLICATED|FCVAR_NOTIFY);
 	EVGame = GetEngineVersion();
 	GetGameAttachPoint();
 	HookEvent("player_death", Event_Death);
+}
+public void OnMapStart() {
+	PrecacheModel("models/error.mdl", true);
 }
 
 public OnPluginEnd() {
@@ -148,7 +151,6 @@ public CreateAttachmentEnt(int client) {
 public CreateAttachmentProp(int client) {
 	RemoveAttachProp(client);
 	int pent = CreateEntityByName("prop_dynamic_override");
-	PrecacheModel("models/error.mdl");
 	DispatchKeyValue(pent, "model", "models/error.mdl");
 	DispatchKeyValue(pent, "disablereceiveshadows", "1");
 	DispatchKeyValue(pent, "disableshadows", "1");
